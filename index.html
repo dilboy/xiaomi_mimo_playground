@@ -1,0 +1,1564 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MiMo TTS 语音合成</title>
+<style>
+:root {
+  --primary: #6366f1;
+  --primary-hover: #4f46e5;
+  --bg: #0f1117;
+  --surface: #1a1d2e;
+  --surface-2: #232740;
+  --border: #2e3348;
+  --text: #e2e8f0;
+  --text-dim: #8892b0;
+  --success: #22c55e;
+  --error: #ef4444;
+  --warning: #f59e0b;
+  --radius: 10px;
+  --shadow: 0 4px 24px rgba(0,0,0,.3);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  line-height: 1.6;
+}
+
+/* ── Layout ── */
+.app {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 24px;
+  display: grid;
+  grid-template-columns: 1fr 380px;
+  gap: 24px;
+  min-height: 100vh;
+}
+
+@media (max-width: 900px) {
+  .app { grid-template-columns: 1fr; padding: 16px; }
+}
+
+.main-col { display: flex; flex-direction: column; gap: 20px; }
+.side-col { display: flex; flex-direction: column; gap: 20px; }
+
+/* ── Card ── */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+}
+
+.card-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.card-title .icon { font-size: 16px; }
+
+/* ── Form Controls ── */
+label {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-dim);
+  margin-bottom: 6px;
+}
+
+input[type="text"],
+input[type="password"],
+textarea,
+select {
+  width: 100%;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 10px 12px;
+  color: var(--text);
+  font-size: 14px;
+  font-family: inherit;
+  transition: border-color .2s;
+  outline: none;
+}
+
+input:focus, textarea:focus, select:focus {
+  border-color: var(--primary);
+}
+
+textarea { resize: vertical; min-height: 80px; }
+select { cursor: pointer; }
+
+.field { margin-bottom: 14px; }
+.field-row { display: flex; gap: 12px; }
+.field-row .field { flex: 1; }
+
+.char-count {
+  text-align: right;
+  font-size: 11px;
+  color: var(--text-dim);
+  margin-top: 4px;
+}
+
+/* ── Toggle ── */
+.toggle-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.toggle {
+  position: relative;
+  width: 44px;
+  height: 24px;
+  cursor: pointer;
+}
+
+.toggle input { opacity: 0; width: 0; height: 0; }
+
+.toggle .slider {
+  position: absolute;
+  inset: 0;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  transition: .2s;
+}
+
+.toggle .slider::before {
+  content: '';
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  left: 2px;
+  top: 2px;
+  background: var(--text-dim);
+  border-radius: 50%;
+  transition: .2s;
+}
+
+.toggle input:checked + .slider { background: var(--primary); border-color: var(--primary); }
+.toggle input:checked + .slider::before { transform: translateX(20px); background: #fff; }
+
+/* ── Buttons ── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 20px;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all .15s;
+}
+
+.btn-primary {
+  background: var(--primary);
+  color: #fff;
+  width: 100%;
+}
+.btn-primary:hover { background: var(--primary-hover); }
+.btn-primary:disabled { opacity: .5; cursor: not-allowed; }
+
+.btn-secondary {
+  background: var(--surface-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+.btn-secondary:hover { background: var(--border); }
+
+.btn-danger {
+  background: transparent;
+  color: var(--error);
+  border: 1px solid var(--error);
+}
+.btn-danger:hover { background: rgba(239,68,68,.1); }
+
+.btn-small {
+  padding: 4px 10px;
+  font-size: 12px;
+}
+
+.btn-group {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+/* ── Tags Panel ── */
+.tags-panel {
+  background: var(--surface-2);
+  border-radius: 6px;
+  padding: 12px;
+  margin-top: 8px;
+}
+
+.tags-section { margin-bottom: 10px; }
+.tags-section:last-child { margin-bottom: 0; }
+
+.tags-label {
+  font-size: 11px;
+  color: var(--text-dim);
+  margin-bottom: 6px;
+  font-weight: 600;
+}
+
+.tags-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.tag-btn {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 3px 8px;
+  font-size: 12px;
+  color: var(--text);
+  cursor: pointer;
+  transition: all .15s;
+  white-space: nowrap;
+}
+
+.tag-btn:hover {
+  background: var(--primary);
+  border-color: var(--primary);
+}
+
+.tag-btn[data-tip]:hover::after {
+  content: attr(data-tip);
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: #000;
+  color: #fff;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  white-space: nowrap;
+  z-index: 10;
+}
+
+.tag-btn { position: relative; }
+
+/* ── File Upload ── */
+.upload-zone {
+  border: 2px dashed var(--border);
+  border-radius: 8px;
+  padding: 24px;
+  text-align: center;
+  cursor: pointer;
+  transition: all .2s;
+  position: relative;
+}
+
+.upload-zone:hover, .upload-zone.dragover {
+  border-color: var(--primary);
+  background: rgba(99,102,241,.05);
+}
+
+.upload-zone .icon { font-size: 32px; margin-bottom: 8px; display: block; }
+.upload-zone .label { font-size: 13px; color: var(--text-dim); }
+.upload-zone input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+
+.file-info {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--surface-2);
+  border-radius: 6px;
+  padding: 10px 12px;
+  margin-top: 8px;
+  font-size: 13px;
+}
+
+.file-info .name { color: var(--text); font-weight: 500; }
+.file-info .size { color: var(--text-dim); }
+
+/* ── Status ── */
+.status-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: var(--surface-2);
+  border-radius: 6px;
+  font-size: 13px;
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-dim);
+  flex-shrink: 0;
+}
+
+.status-dot.ready { background: var(--success); }
+.status-dot.working { background: var(--warning); animation: pulse 1s infinite; }
+.status-dot.error { background: var(--error); }
+
+@keyframes pulse { 50% { opacity: .4; } }
+
+/* ── Audio Player ── */
+.player-area {
+  display: none;
+}
+
+.player-area.visible { display: block; }
+
+audio {
+  width: 100%;
+  border-radius: 6px;
+  margin: 12px 0;
+}
+
+/* ── Visualizer ── */
+.visualizer-container {
+  height: 60px;
+  background: var(--surface-2);
+  border-radius: 6px;
+  overflow: hidden;
+  margin-bottom: 12px;
+  display: none;
+}
+
+.visualizer-container.visible { display: block; }
+.visualizer-container canvas { width: 100%; height: 100%; }
+
+/* ── History ── */
+.history-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  background: var(--surface-2);
+  border-radius: 6px;
+  margin-bottom: 8px;
+  cursor: pointer;
+  transition: background .15s;
+}
+
+.history-item:hover { background: var(--border); }
+
+.history-item .info {
+  flex: 1;
+  min-width: 0;
+}
+
+.history-item .text {
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.history-item .meta {
+  font-size: 11px;
+  color: var(--text-dim);
+  margin-top: 2px;
+}
+
+.history-item .actions {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+  margin-left: 8px;
+}
+
+/* ── Director Mode ── */
+.director-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+@media (max-width: 600px) {
+  .director-grid { grid-template-columns: 1fr; }
+}
+
+.director-grid .field { margin-bottom: 0; }
+
+/* ── Presets ── */
+.preset-row {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.preset-btn {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 4px 12px;
+  font-size: 12px;
+  color: var(--text);
+  cursor: pointer;
+  transition: all .15s;
+}
+
+.preset-btn:hover {
+  background: var(--primary);
+  border-color: var(--primary);
+}
+
+/* ── Hidden ── */
+.hidden { display: none !important; }
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+/* ── URL display ── */
+.url-display {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 12px;
+  color: var(--text-dim);
+  font-family: 'SF Mono', Monaco, monospace;
+  word-break: break-all;
+}
+
+/* ── Error display ── */
+.error-msg {
+  color: var(--error);
+  font-size: 13px;
+  margin-top: 8px;
+  display: none;
+}
+
+.error-msg.visible { display: block; }
+
+/* ── Tab style for model info ── */
+.model-badge {
+  display: inline-block;
+  background: var(--primary);
+  color: #fff;
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  margin-left: 8px;
+  font-weight: 500;
+}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- ═══════════ LEFT COLUMN ═══════════ -->
+  <div class="main-col">
+
+    <!-- ── Global Config ── -->
+    <div class="card">
+      <div class="card-title"><span class="icon">&#9881;</span> 全局配置</div>
+      <div class="field-row">
+        <div class="field" style="flex:2">
+          <label>API Key</label>
+          <input type="password" id="apiKey" placeholder="输入你的 API Key" autocomplete="off">
+        </div>
+        <div class="field" style="flex:3">
+          <label>Base URL</label>
+          <input type="text" id="baseUrl" value="https://api.xiaomimimo.com/v1" placeholder="API 地址">
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label>模型</label>
+          <select id="modelSelect">
+            <option value="mimo-v2.5-tts">mimo-v2.5-tts（预置音色）</option>
+            <option value="mimo-v2.5-tts-voicedesign">mimo-v2.5-tts-voicedesign（文本设计音色）</option>
+            <option value="mimo-v2.5-tts-voiceclone">mimo-v2.5-tts-voiceclone（音色复刻）</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>输出格式</label>
+          <select id="formatSelect">
+            <option value="wav">wav（非流式推荐）</option>
+            <option value="pcm16">pcm16（流式推荐）</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>流式传输</label>
+          <div class="toggle-wrap" style="margin-top: 4px;">
+            <label class="toggle">
+              <input type="checkbox" id="streamToggle">
+              <span class="slider"></span>
+            </label>
+            <span id="streamLabel" style="font-size:13px; color: var(--text-dim);">关闭</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Dynamic Input: Model A (预置音色) ── -->
+    <div class="card" id="sectionA">
+      <div class="card-title">
+        <span class="icon">&#127908;</span> 预置音色合成
+        <span class="model-badge">mimo-v2.5-tts</span>
+      </div>
+
+      <div class="field">
+        <label>预置音色</label>
+        <select id="voiceSelect">
+          <option value="mimo_default">mimo_default（默认）</option>
+          <option value="冰糖">冰糖</option>
+          <option value="茉莉">茉莉</option>
+          <option value="苏打">苏打</option>
+          <option value="白桦">白桦</option>
+          <option value="Mia">Mia</option>
+          <option value="Chloe">Chloe</option>
+          <option value="Milo">Milo</option>
+          <option value="Dean">Dean</option>
+        </select>
+      </div>
+
+      <!-- Director Mode -->
+      <div class="field">
+        <label>导演模式（快速填充 User Message）</label>
+        <div class="director-grid">
+          <div class="field">
+            <input type="text" id="dirRole" placeholder="角色：如 小女孩">
+          </div>
+          <div class="field">
+            <input type="text" id="dirScene" placeholder="场景：如 生日派对">
+          </div>
+          <div class="field">
+            <input type="text" id="dirGuide" placeholder="指导：如 开心活泼">
+          </div>
+        </div>
+        <button class="btn btn-secondary btn-small" onclick="fillDirector()">填充到 User Message</button>
+      </div>
+
+      <div class="field">
+        <label>User Message（可选，风格控制/导演指令）</label>
+        <textarea id="userMsgA" rows="2" placeholder="输入自然语言风格控制指令，如：用温柔的语气，语速稍慢"></textarea>
+        <div class="char-count"><span id="userMsgACount">0</span> 字</div>
+      </div>
+
+      <div class="field">
+        <label>Assistant Message（必填，合成文本）</label>
+        <textarea id="assistantMsgA" rows="4" placeholder="输入要合成的文本内容"></textarea>
+        <div class="char-count"><span id="assistantMsgACount">0</span> 字</div>
+
+        <!-- Tags Panel -->
+        <div class="tags-panel">
+          <div class="tags-section">
+            <div class="tags-label">情绪/风格标签（插入到文本中）</div>
+            <div class="tags-grid">
+              <button class="tag-btn" data-insert="(开心)" data-tip="开心语气">(开心)</button>
+              <button class="tag-btn" data-insert="(悲伤)" data-tip="悲伤语气">(悲伤)</button>
+              <button class="tag-btn" data-insert="(愤怒)" data-tip="愤怒语气">(愤怒)</button>
+              <button class="tag-btn" data-insert="(惊讶)" data-tip="惊讶语气">(惊讶)</button>
+              <button class="tag-btn" data-insert="(温柔)" data-tip="温柔语气">(温柔)</button>
+              <button class="tag-btn" data-insert="(激动)" data-tip="激动语气">(激动)</button>
+              <button class="tag-btn" data-insert="(平静)" data-tip="平静语气">(平静)</button>
+              <button class="tag-btn" data-insert="(恐惧)" data-tip="恐惧语气">(恐惧)</button>
+              <button class="tag-btn" data-insert="(厌恶)" data-tip="厌恶语气">(厌恶)</button>
+              <button class="tag-btn" data-insert="(撒娇)" data-tip="撒娇语气">(撒娇)</button>
+              <button class="tag-btn" data-insert="(唱歌)" data-tip="唱歌模式">(唱歌)</button>
+              <button class="tag-btn" data-insert="(东北话)" data-tip="东北方言">(东北话)</button>
+              <button class="tag-btn" data-insert="(四川话)" data-tip="四川方言">(四川话)</button>
+              <button class="tag-btn" data-insert="(粤语)" data-tip="粤语">(粤语)</button>
+            </div>
+          </div>
+          <div class="tags-section">
+            <div class="tags-label">音频标签（插入到文本中）</div>
+            <div class="tags-grid">
+              <button class="tag-btn" data-insert="[吸气]" data-tip="吸气声">[吸气]</button>
+              <button class="tag-btn" data-insert="[叹气]" data-tip="叹气声">[叹气]</button>
+              <button class="tag-btn" data-insert="[轻笑]" data-tip="轻笑声">[轻笑]</button>
+              <button class="tag-btn" data-insert="[大笑]" data-tip="大笑声">[大笑]</button>
+              <button class="tag-btn" data-insert="[哭泣]" data-tip="哭泣声">[哭泣]</button>
+              <button class="tag-btn" data-insert="[颤抖]" data-tip="颤抖声">[颤抖]</button>
+              <button class="tag-btn" data-insert="[咳嗽]" data-tip="咳嗽声">[咳嗽]</button>
+              <button class="tag-btn" data-insert="[停顿]" data-tip="短暂停顿">[停顿]</button>
+            </div>
+          </div>
+          <div style="font-size:11px; color: var(--text-dim); margin-top:6px;">
+            点击标签自动插入到 Assistant Message 光标位置
+          </div>
+        </div>
+      </div>
+
+      <!-- Presets -->
+      <div class="field">
+        <label>语速/情绪快捷预设</label>
+        <div class="preset-row">
+          <button class="preset-btn" data-user="用温柔甜美的语气，语速稍慢" data-text="你好呀，今天天气真好，要不要一起出去走走？">温柔甜美</button>
+          <button class="preset-btn" data-user="用激动兴奋的语气，语速较快" data-text="太棒了！我们终于成功了！这简直不可思议！">激动兴奋</button>
+          <button class="preset-btn" data-user="用平静沉稳的语气，语速适中" data-text="根据最新的数据分析，我们可以得出以下结论。">平静播报</button>
+          <button class="preset-btn" data-user="用悲伤低沉的语气，语速缓慢" data-text="他走了，再也没有回来。那个冬天，格外寒冷。">悲伤低沉</button>
+          <button class="preset-btn" data-user="用活泼可爱的语气，像小女孩一样" data-text="哇！这个好好玩呀！你也来试试嘛！">活泼可爱</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Dynamic Input: Model B (文本设计音色) ── -->
+    <div class="card hidden" id="sectionB">
+      <div class="card-title">
+        <span class="icon">&#127912;</span> 文本设计音色
+        <span class="model-badge">mimo-v2.5-tts-voicedesign</span>
+      </div>
+
+      <div class="field">
+        <label>音色描述（必填，对应 user message）</label>
+        <textarea id="voiceDesc" rows="3" placeholder="描述你想要的音色特征，如：年轻女性，温柔治愈，语速适中，带有甜美感"></textarea>
+        <div class="char-count"><span id="voiceDescCount">0</span> 字</div>
+        <div style="margin-top: 8px;">
+          <div class="tags-label">音色描述模板（点击填入）</div>
+          <div class="preset-row">
+            <button class="preset-btn" data-target="voiceDesc" data-text="年轻女性，温柔治愈，语速适中，声音甜美">温柔女声</button>
+            <button class="preset-btn" data-target="voiceDesc" data-text="成熟男性，低沉磁性，语速偏慢，沉稳大气">磁性男声</button>
+            <button class="preset-btn" data-target="voiceDesc" data-text="儿童，天真活泼，语速稍快，充满童趣">童声</button>
+            <button class="preset-btn" data-target="voiceDesc" data-text="老年男性，沧桑浑厚，语速缓慢，富有故事感">沧桑老者</button>
+            <button class="preset-btn" data-target="voiceDesc" data-text="年轻女性，元气少女，语速偏快，充满活力，略带鼻音">元气少女</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>合成文本（必填，对应 assistant message）</label>
+        <textarea id="synthText" rows="4" placeholder="输入要合成的文本内容"></textarea>
+        <div class="char-count"><span id="synthTextCount">0</span> 字</div>
+        <div style="margin-top: 8px;">
+          <button class="btn btn-secondary btn-small" onclick="generateSampleText()">自动生成示例文本</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Dynamic Input: Model C (音色复刻) ── -->
+    <div class="card hidden" id="sectionC">
+      <div class="card-title">
+        <span class="icon">&#127925;</span> 音色复刻
+        <span class="model-badge">mimo-v2.5-tts-voiceclone</span>
+      </div>
+
+      <div class="field">
+        <label>音频样本上传</label>
+        <div class="upload-zone" id="uploadZone">
+          <span class="icon">&#128228;</span>
+          <div class="label">拖拽上传 .mp3 或 .wav 文件，或点击选择</div>
+          <div style="font-size:11px; color: var(--text-dim); margin-top:4px;">Base64 后不超过 10MB（原始文件约 7.5MB）</div>
+          <input type="file" id="audioFileInput" accept=".mp3,.wav,audio/mpeg,audio/wav">
+        </div>
+        <div id="fileInfo" class="file-info hidden">
+          <div>
+            <span class="name" id="fileName"></span>
+            <span class="size" id="fileSize"></span>
+          </div>
+          <button class="btn btn-danger btn-small" onclick="removeFile()">删除</button>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>User Message（可选，风格控制）</label>
+        <textarea id="userMsgC" rows="2" placeholder="输入自然语言风格控制指令（可选）"></textarea>
+        <div class="char-count"><span id="userMsgCCount">0</span> 字</div>
+      </div>
+
+      <div class="field">
+        <label>Assistant Message（必填，合成文本）</label>
+        <textarea id="assistantMsgC" rows="4" placeholder="输入要合成的文本内容"></textarea>
+        <div class="char-count"><span id="assistantMsgCCount">0</span> 字</div>
+      </div>
+    </div>
+
+    <!-- ── Action Buttons ── -->
+    <div class="card">
+      <div class="btn-group">
+        <button class="btn btn-primary" id="synthesizeBtn" onclick="synthesize()">
+          &#9654;&ensp;开始合成
+        </button>
+        <button class="btn btn-secondary" id="stopBtn" onclick="stopSynthesis()" disabled>
+          &#9632;&ensp;停止
+        </button>
+        <button class="btn btn-secondary" onclick="resetAll()">
+          &#8634;&ensp;重置
+        </button>
+      </div>
+    </div>
+
+    <!-- ── Result Area ── -->
+    <div class="card">
+      <div class="card-title"><span class="icon">&#127926;</span> 合成结果</div>
+
+      <div class="status-bar">
+        <span class="status-dot ready" id="statusDot"></span>
+        <span id="statusText">准备就绪</span>
+      </div>
+
+      <div class="error-msg" id="errorMsg"></div>
+
+      <div class="visualizer-container" id="visualizerWrap">
+        <canvas id="visualizerCanvas"></canvas>
+      </div>
+
+      <div class="player-area" id="playerArea">
+        <audio id="audioPlayer" controls></audio>
+        <div class="btn-group">
+          <button class="btn btn-secondary btn-small" onclick="downloadAudio()">&#11015; 下载音频</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════ RIGHT COLUMN ═══════════ -->
+  <div class="side-col">
+
+    <!-- ── History ── -->
+    <div class="card" style="flex: 1; overflow: hidden; display: flex; flex-direction: column;">
+      <div class="card-title">
+        <span class="icon">&#128196;</span> 历史记录
+        <button class="btn btn-secondary btn-small" style="margin-left:auto" onclick="clearHistory()">清空</button>
+      </div>
+      <div id="historyList" style="flex:1; overflow-y: auto; min-height: 0;">
+        <div style="text-align: center; color: var(--text-dim); font-size: 13px; padding: 20px;">
+          暂无历史记录
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Tips ── -->
+    <div class="card">
+      <div class="card-title"><span class="icon">&#128161;</span> 使用提示</div>
+      <div style="font-size: 12px; color: var(--text-dim); line-height: 1.8;">
+        <p>&#8226; API Key 仅存储在浏览器本地，不会上传</p>
+        <p>&#8226; 流式模式推荐使用 pcm16 格式</p>
+        <p>&#8226; 音色复刻的音频样本建议 10-30 秒</p>
+        <p>&#8226; 文本中可使用 <code>(情绪)</code> 和 <code>[音频]</code> 标签</p>
+        <p>&#8226; 如遇 CORS 错误，请使用后端代理</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════
+// Constants & State
+// ═══════════════════════════════════════════
+
+const DEFAULT_BASE_URL = 'https://api.xiaomimimo.com/v1';
+const SAMPLE_RATE = 24000; // pcm16 采样率
+const MAX_FILE_SIZE = 7.5 * 1024 * 1024; // ~7.5MB raw → ~10MB base64
+
+let currentAudioBlob = null;
+let currentAbortController = null;
+let audioContext = null;
+let analyser = null;
+let animFrameId = null;
+
+// ═══════════════════════════════════════════
+// Initialization
+// ═══════════════════════════════════════════
+
+document.addEventListener('DOMContentLoaded', () => {
+  // Restore API Key from localStorage
+  const savedKey = localStorage.getItem('mimo_api_key');
+  if (savedKey) document.getElementById('apiKey').value = savedKey;
+
+  // Save API Key on change
+  document.getElementById('apiKey').addEventListener('input', (e) => {
+    localStorage.setItem('mimo_api_key', e.target.value);
+  });
+
+  // Restore Base URL from localStorage
+  const savedUrl = localStorage.getItem('mimo_base_url');
+  if (savedUrl) document.getElementById('baseUrl').value = savedUrl;
+
+  // Save Base URL on change
+  document.getElementById('baseUrl').addEventListener('input', (e) => {
+    localStorage.setItem('mimo_base_url', e.target.value);
+  });
+
+  // Model switching
+  document.getElementById('modelSelect').addEventListener('change', switchModel);
+
+  // Stream toggle
+  document.getElementById('streamToggle').addEventListener('change', (e) => {
+    document.getElementById('streamLabel').textContent = e.target.checked ? '开启' : '关闭';
+    if (e.target.checked) {
+      document.getElementById('formatSelect').value = 'pcm16';
+    }
+  });
+
+  // Char counters
+  setupCharCount('userMsgA', 'userMsgACount');
+  setupCharCount('assistantMsgA', 'assistantMsgACount');
+  setupCharCount('voiceDesc', 'voiceDescCount');
+  setupCharCount('synthText', 'synthTextCount');
+  setupCharCount('userMsgC', 'userMsgCCount');
+  setupCharCount('assistantMsgC', 'assistantMsgCCount');
+
+  // Tag buttons (insert into assistantMsgA)
+  document.querySelectorAll('.tag-btn[data-insert]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      insertAtCursor('assistantMsgA', btn.dataset.insert);
+    });
+  });
+
+  // Preset buttons (Model A)
+  document.querySelectorAll('.preset-btn[data-user]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.getElementById('userMsgA').value = btn.dataset.user;
+      document.getElementById('assistantMsgA').value = btn.dataset.text;
+      updateCount('userMsgA', 'userMsgACount');
+      updateCount('assistantMsgA', 'assistantMsgACount');
+    });
+  });
+
+  // Preset buttons (Voice description templates)
+  document.querySelectorAll('.preset-btn[data-target]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.getElementById(btn.dataset.target).value = btn.dataset.text;
+      updateCount(btn.dataset.target, btn.dataset.target + 'Count');
+    });
+  });
+
+  // File upload
+  setupFileUpload();
+
+  // Load history
+  renderHistory();
+});
+
+// ═══════════════════════════════════════════
+// Model Switching
+// ═══════════════════════════════════════════
+
+function switchModel() {
+  const model = document.getElementById('modelSelect').value;
+  const sections = {
+    'mimo-v2.5-tts': 'sectionA',
+    'mimo-v2.5-tts-voicedesign': 'sectionB',
+    'mimo-v2.5-tts-voiceclone': 'sectionC'
+  };
+
+  Object.entries(sections).forEach(([key, id]) => {
+    const el = document.getElementById(id);
+    if (key === model) {
+      el.classList.remove('hidden');
+      el.style.animation = 'fadeIn .3s ease';
+    } else {
+      el.classList.add('hidden');
+    }
+  });
+}
+
+// ═══════════════════════════════════════════
+// Char Count Helpers
+// ═══════════════════════════════════════════
+
+function setupCharCount(inputId, countId) {
+  const input = document.getElementById(inputId);
+  if (!input) return;
+  input.addEventListener('input', () => updateCount(inputId, countId));
+}
+
+function updateCount(inputId, countId) {
+  const input = document.getElementById(inputId);
+  const count = document.getElementById(countId);
+  if (input && count) {
+    count.textContent = input.value.length;
+  }
+}
+
+// ═══════════════════════════════════════════
+// Tag Insertion
+// ═══════════════════════════════════════════
+
+function insertAtCursor(textareaId, text) {
+  const el = document.getElementById(textareaId);
+  const start = el.selectionStart;
+  const end = el.selectionEnd;
+  const before = el.value.substring(0, start);
+  const after = el.value.substring(end);
+  el.value = before + text + after;
+  el.selectionStart = el.selectionEnd = start + text.length;
+  el.focus();
+  updateCount(textareaId, textareaId + 'Count');
+}
+
+// ═══════════════════════════════════════════
+// Director Mode
+// ═══════════════════════════════════════════
+
+function fillDirector() {
+  const role = document.getElementById('dirRole').value.trim();
+  const scene = document.getElementById('dirScene').value.trim();
+  const guide = document.getElementById('dirGuide').value.trim();
+
+  if (!role && !scene && !guide) return;
+
+  let msg = '';
+  if (role) msg += `角色：${role}\n`;
+  if (scene) msg += `场景：${scene}\n`;
+  if (guide) msg += `指导：${guide}`;
+
+  document.getElementById('userMsgA').value = msg.trim();
+  updateCount('userMsgA', 'userMsgACount');
+}
+
+// ═══════════════════════════════════════════
+// File Upload (Voice Clone)
+// ═══════════════════════════════════════════
+
+let uploadedFileData = null; // { name, size, base64, mime }
+
+function setupFileUpload() {
+  const zone = document.getElementById('uploadZone');
+  const input = document.getElementById('audioFileInput');
+
+  zone.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    zone.classList.add('dragover');
+  });
+
+  zone.addEventListener('dragleave', () => {
+    zone.classList.remove('dragover');
+  });
+
+  zone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    zone.classList.remove('dragover');
+    const file = e.dataTransfer.files[0];
+    if (file) processFile(file);
+  });
+
+  input.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (file) processFile(file);
+  });
+}
+
+function processFile(file) {
+  if (!file.name.match(/\.(mp3|wav)$/i)) {
+    showError('请上传 .mp3 或 .wav 文件');
+    return;
+  }
+
+  if (file.size > MAX_FILE_SIZE) {
+    showError(`文件过大（${formatSize(file.size)}），请压缩到 7.5MB 以内`);
+    return;
+  }
+
+  const reader = new FileReader();
+  reader.onload = () => {
+    const base64 = reader.result.split(',')[1];
+    uploadedFileData = {
+      name: file.name,
+      size: file.size,
+      base64: base64,
+      mime: file.type || (file.name.endsWith('.wav') ? 'audio/wav' : 'audio/mpeg')
+    };
+
+    document.getElementById('fileName').textContent = file.name;
+    document.getElementById('fileSize').textContent = `（${formatSize(file.size)}）`;
+    document.getElementById('fileInfo').classList.remove('hidden');
+    document.getElementById('uploadZone').classList.add('hidden');
+  };
+  reader.readAsDataURL(file);
+}
+
+function removeFile() {
+  uploadedFileData = null;
+  document.getElementById('fileInfo').classList.add('hidden');
+  document.getElementById('uploadZone').classList.remove('hidden');
+  document.getElementById('audioFileInput').value = '';
+}
+
+function formatSize(bytes) {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+  return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+}
+
+// ═══════════════════════════════════════════
+// Sample Text Generator
+// ═══════════════════════════════════════════
+
+function generateSampleText() {
+  const templates = [
+    '春天来了，公园里的花都开了。红的、黄的、紫的，五颜六色，美丽极了。',
+    '在那遥远的山村里，有一条清澈的小溪，溪水潺潺流过青石板，发出悦耳的声响。',
+    '各位观众朋友大家好，欢迎收看今天的新闻节目，首先来关注一下国内外的重要消息。',
+    '嘿！你知道吗？今天我在路上看到了一只超可爱的小猫咪，它的眼睛像两颗蓝宝石一样！',
+    '人生就像一场旅行，不必在乎目的地，在乎的是沿途的风景，以及看风景的心情。',
+    '今天我们要做的这道菜非常简单，首先准备好食材：西红柿两个、鸡蛋三个、葱花适量。'
+  ];
+  const text = templates[Math.floor(Math.random() * templates.length)];
+  document.getElementById('synthText').value = text;
+  updateCount('synthText', 'synthTextCount');
+}
+
+// ═══════════════════════════════════════════
+// Synthesis - Main Logic
+// ═══════════════════════════════════════════
+
+async function synthesize() {
+  const apiKey = document.getElementById('apiKey').value.trim();
+  if (!apiKey) {
+    showError('请先填写 API Key');
+    return;
+  }
+
+  const model = document.getElementById('modelSelect').value;
+  const format = document.getElementById('formatSelect').value;
+  const stream = document.getElementById('streamToggle').checked;
+
+  // Build request body based on model
+  let userContent, assistantContent, voice;
+
+  if (model === 'mimo-v2.5-tts') {
+    voice = document.getElementById('voiceSelect').value;
+    userContent = document.getElementById('userMsgA').value.trim();
+    assistantContent = document.getElementById('assistantMsgA').value.trim();
+    if (!assistantContent) {
+      showError('请输入要合成的文本（Assistant Message）');
+      return;
+    }
+  } else if (model === 'mimo-v2.5-tts-voicedesign') {
+    voice = undefined; // voicedesign 不需要 voice 字段
+    userContent = document.getElementById('voiceDesc').value.trim();
+    assistantContent = document.getElementById('synthText').value.trim();
+    if (!userContent) {
+      showError('请输入音色描述');
+      return;
+    }
+    if (!assistantContent) {
+      showError('请输入要合成的文本');
+      return;
+    }
+  } else if (model === 'mimo-v2.5-tts-voiceclone') {
+    if (!uploadedFileData) {
+      showError('请先上传音频样本');
+      return;
+    }
+    voice = `data:${uploadedFileData.mime};base64,${uploadedFileData.base64}`;
+    userContent = document.getElementById('userMsgC').value.trim();
+    assistantContent = document.getElementById('assistantMsgC').value.trim();
+    if (!assistantContent) {
+      showError('请输入要合成的文本（Assistant Message）');
+      return;
+    }
+  }
+
+  // Construct messages
+  const messages = [];
+  if (userContent || model === 'mimo-v2.5-tts-voicedesign') {
+    messages.push({ role: 'user', content: userContent || '' });
+  }
+  messages.push({ role: 'assistant', content: assistantContent });
+
+  // Construct body
+  // API body structure per documentation:
+  // - model: model ID
+  // - messages: [{role, content}, ...]
+  // - audio: {format, voice}
+  // - stream: boolean
+  const body = {
+    model: model,
+    messages: messages,
+    audio: {
+      format: format
+    },
+    stream: stream
+  };
+
+  // Add voice field if applicable
+  if (voice !== undefined) {
+    body.audio.voice = voice;
+  }
+
+  // Update UI
+  setStatus('working', stream ? '流式请求中...' : '合成中...');
+  hideError();
+  document.getElementById('synthesizeBtn').disabled = true;
+  document.getElementById('stopBtn').disabled = false;
+  document.getElementById('playerArea').classList.remove('visible');
+
+  currentAbortController = new AbortController();
+
+  try {
+    if (stream) {
+      await synthesizeStream(apiKey, body, format);
+    } else {
+      await synthesizeNonStream(apiKey, body, format);
+    }
+  } catch (err) {
+    if (err.name === 'AbortError') {
+      setStatus('ready', '已停止');
+    } else {
+      setStatus('error', '合成失败');
+      showError(err.message || '请求失败');
+    }
+  } finally {
+    document.getElementById('synthesizeBtn').disabled = false;
+    document.getElementById('stopBtn').disabled = true;
+    currentAbortController = null;
+  }
+}
+
+// ── Non-stream synthesis ──
+async function synthesizeNonStream(apiKey, body, format) {
+  const resp = await fetch(`${document.getElementById('baseUrl').value.replace(/\/+$/, '')}/chat/completions`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'api-key': apiKey
+    },
+    body: JSON.stringify(body),
+    signal: currentAbortController.signal
+  });
+
+  if (!resp.ok) {
+    const errData = await resp.json().catch(() => ({}));
+    throw new Error(errData.error?.message || `HTTP ${resp.status}: ${resp.statusText}`);
+  }
+
+  const data = await resp.json();
+
+  // Extract audio data per API response structure:
+  // choices[0].message.audio.data (base64 encoded)
+  const audioBase64 = data.choices?.[0]?.message?.audio?.data;
+  if (!audioBase64) {
+    throw new Error('响应中未找到音频数据');
+  }
+
+  // Decode base64 to blob
+  const binaryStr = atob(audioBase64);
+  const bytes = new Uint8Array(binaryStr.length);
+  for (let i = 0; i < binaryStr.length; i++) {
+    bytes[i] = binaryStr.charCodeAt(i);
+  }
+
+  const mimeType = format === 'wav' ? 'audio/wav' : 'audio/pcm';
+  currentAudioBlob = new Blob([bytes], { type: mimeType });
+
+  playAudio(currentAudioBlob, format);
+  setStatus('ready', '合成完成');
+  addToHistory(body.messages[body.messages.length - 1].content, body.model, currentAudioBlob);
+}
+
+// ── Stream synthesis ──
+async function synthesizeStream(apiKey, body, format) {
+  const resp = await fetch(`${document.getElementById('baseUrl').value.replace(/\/+$/, '')}/chat/completions`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'api-key': apiKey
+    },
+    body: JSON.stringify(body),
+    signal: currentAbortController.signal
+  });
+
+  if (!resp.ok) {
+    const errData = await resp.json().catch(() => ({}));
+    throw new Error(errData.error?.message || `HTTP ${resp.status}: ${resp.statusText}`);
+  }
+
+  // Parse SSE stream
+  const reader = resp.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let audioChunks = [];
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split('\n');
+    buffer = lines.pop(); // keep incomplete line
+
+    for (const line of lines) {
+      if (!line.startsWith('data: ')) continue;
+      const jsonStr = line.slice(6).trim();
+      if (jsonStr === '[DONE]') continue;
+
+      try {
+        const chunk = JSON.parse(jsonStr);
+        const audioData = chunk.choices?.[0]?.delta?.audio?.data;
+        if (audioData) {
+          const binaryStr = atob(audioData);
+          const bytes = new Uint8Array(binaryStr.length);
+          for (let i = 0; i < binaryStr.length; i++) {
+            bytes[i] = binaryStr.charCodeAt(i);
+          }
+          audioChunks.push(bytes);
+        }
+      } catch (e) {
+        // skip malformed chunks
+      }
+    }
+  }
+
+  if (audioChunks.length === 0) {
+    throw new Error('流式响应中未收到音频数据');
+  }
+
+  // Concatenate all chunks
+  if (format === 'pcm16') {
+    // Merge PCM16 chunks → WAV
+    const totalLength = audioChunks.reduce((sum, c) => sum + c.length, 0);
+    const merged = new Uint8Array(totalLength);
+    let offset = 0;
+    for (const chunk of audioChunks) {
+      merged.set(chunk, offset);
+      offset += chunk.length;
+    }
+    currentAudioBlob = pcm16ToWav(merged, SAMPLE_RATE);
+  } else {
+    // WAV chunks: just concatenate (assuming each chunk is a valid WAV or raw)
+    const totalLength = audioChunks.reduce((sum, c) => sum + c.length, 0);
+    const merged = new Uint8Array(totalLength);
+    let offset = 0;
+    for (const chunk of audioChunks) {
+      merged.set(chunk, offset);
+      offset += chunk.length;
+    }
+    currentAudioBlob = new Blob([merged], { type: 'audio/wav' });
+  }
+
+  playAudio(currentAudioBlob, 'wav');
+  setStatus('ready', '流式合成完成');
+  addToHistory(body.messages[body.messages.length - 1].content, body.model, currentAudioBlob);
+}
+
+// ═══════════════════════════════════════════
+// PCM16 → WAV conversion
+// ═══════════════════════════════════════════
+
+function pcm16ToWav(pcmData, sampleRate) {
+  const numChannels = 1;
+  const bitsPerSample = 16;
+  const byteRate = sampleRate * numChannels * (bitsPerSample / 8);
+  const blockAlign = numChannels * (bitsPerSample / 8);
+  const dataSize = pcmData.length;
+  const headerSize = 44;
+  const buffer = new ArrayBuffer(headerSize + dataSize);
+  const view = new DataView(buffer);
+
+  // RIFF header
+  writeString(view, 0, 'RIFF');
+  view.setUint32(4, 36 + dataSize, true);
+  writeString(view, 8, 'WAVE');
+
+  // fmt sub-chunk
+  writeString(view, 12, 'fmt ');
+  view.setUint32(16, 16, true);         // sub-chunk size
+  view.setUint16(20, 1, true);          // PCM format
+  view.setUint16(22, numChannels, true);
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, byteRate, true);
+  view.setUint16(32, blockAlign, true);
+  view.setUint16(34, bitsPerSample, true);
+
+  // data sub-chunk
+  writeString(view, 36, 'data');
+  view.setUint32(40, dataSize, true);
+
+  // PCM data
+  new Uint8Array(buffer, headerSize).set(pcmData);
+
+  return new Blob([buffer], { type: 'audio/wav' });
+}
+
+function writeString(view, offset, str) {
+  for (let i = 0; i < str.length; i++) {
+    view.setUint8(offset + i, str.charCodeAt(i));
+  }
+}
+
+// ═══════════════════════════════════════════
+// Audio Playback & Visualization
+// ═══════════════════════════════════════════
+
+function playAudio(blob, format) {
+  const url = URL.createObjectURL(blob);
+  const player = document.getElementById('audioPlayer');
+  player.src = url;
+  document.getElementById('playerArea').classList.add('visible');
+
+  // Setup visualizer
+  setupVisualizer(player);
+}
+
+function setupVisualizer(audioEl) {
+  const wrap = document.getElementById('visualizerWrap');
+  const canvas = document.getElementById('visualizerCanvas');
+
+  if (!audioContext) {
+    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+  }
+
+  // Disconnect previous source if any
+  try {
+    const source = audioContext.createMediaElementSource(audioEl);
+    analyser = audioContext.createAnalyser();
+    analyser.fftSize = 256;
+    source.connect(analyser);
+    analyser.connect(audioContext.destination);
+  } catch (e) {
+    // Already connected — that's fine
+  }
+
+  wrap.classList.add('visible');
+
+  const ctx = canvas.getContext('2d');
+  const bufferLength = analyser.frequencyBinCount;
+  const dataArray = new Uint8Array(bufferLength);
+
+  function draw() {
+    animFrameId = requestAnimationFrame(draw);
+    analyser.getByteFrequencyData(dataArray);
+
+    canvas.width = canvas.offsetWidth;
+    canvas.height = canvas.offsetHeight;
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    const barWidth = (canvas.width / bufferLength) * 2.5;
+    let x = 0;
+
+    for (let i = 0; i < bufferLength; i++) {
+      const barHeight = (dataArray[i] / 255) * canvas.height;
+      const hue = (i / bufferLength) * 60 + 220; // purple-blue gradient
+      ctx.fillStyle = `hsla(${hue}, 80%, 60%, 0.8)`;
+      ctx.fillRect(x, canvas.height - barHeight, barWidth, barHeight);
+      x += barWidth + 1;
+    }
+  }
+
+  // Start drawing on play
+  audioEl.addEventListener('play', () => draw());
+  audioEl.addEventListener('pause', () => {
+    if (animFrameId) cancelAnimationFrame(animFrameId);
+  });
+  audioEl.addEventListener('ended', () => {
+    if (animFrameId) cancelAnimationFrame(animFrameId);
+  });
+}
+
+// ═══════════════════════════════════════════
+// Download
+// ═══════════════════════════════════════════
+
+function downloadAudio() {
+  if (!currentAudioBlob) return;
+  const url = URL.createObjectURL(currentAudioBlob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `mimo_tts_${Date.now()}.wav`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ═══════════════════════════════════════════
+// Stop / Reset
+// ═══════════════════════════════════════════
+
+function stopSynthesis() {
+  if (currentAbortController) {
+    currentAbortController.abort();
+  }
+}
+
+function resetAll() {
+  // Reset inputs based on current model
+  document.getElementById('userMsgA').value = '';
+  document.getElementById('assistantMsgA').value = '';
+  document.getElementById('voiceDesc').value = '';
+  document.getElementById('synthText').value = '';
+  document.getElementById('userMsgC').value = '';
+  document.getElementById('assistantMsgC').value = '';
+  document.getElementById('dirRole').value = '';
+  document.getElementById('dirScene').value = '';
+  document.getElementById('dirGuide').value = '';
+
+  // Reset file upload
+  removeFile();
+
+  // Reset char counts
+  document.querySelectorAll('.char-count span').forEach(el => el.textContent = '0');
+
+  // Reset player
+  const player = document.getElementById('audioPlayer');
+  player.pause();
+  player.src = '';
+  document.getElementById('playerArea').classList.remove('visible');
+  document.getElementById('visualizerWrap').classList.remove('visible');
+  currentAudioBlob = null;
+
+  hideError();
+  setStatus('ready', '准备就绪');
+}
+
+// ═══════════════════════════════════════════
+// Status & Error Helpers
+// ═══════════════════════════════════════════
+
+function setStatus(state, text) {
+  const dot = document.getElementById('statusDot');
+  const label = document.getElementById('statusText');
+  dot.className = 'status-dot ' + state;
+  label.textContent = text;
+}
+
+function showError(msg) {
+  const el = document.getElementById('errorMsg');
+  el.textContent = msg;
+  el.classList.add('visible');
+  setStatus('error', '出错了');
+}
+
+function hideError() {
+  document.getElementById('errorMsg').classList.remove('visible');
+}
+
+// ═══════════════════════════════════════════
+// History (localStorage)
+// ═══════════════════════════════════════════
+
+function getHistory() {
+  try {
+    return JSON.parse(localStorage.getItem('mimo_tts_history') || '[]');
+  } catch {
+    return [];
+  }
+}
+
+function addToHistory(text, model, blob) {
+  const history = getHistory();
+  const reader = new FileReader();
+  reader.onload = () => {
+    history.unshift({
+      id: Date.now(),
+      text: text.substring(0, 100),
+      model: model,
+      audioBase64: reader.result.split(',')[1],
+      timestamp: new Date().toLocaleString('zh-CN')
+    });
+    // Keep last 20
+    if (history.length > 20) history.length = 20;
+    localStorage.setItem('mimo_tts_history', JSON.stringify(history));
+    renderHistory();
+  };
+  reader.readAsDataURL(blob);
+}
+
+function renderHistory() {
+  const list = document.getElementById('historyList');
+  const history = getHistory();
+
+  if (history.length === 0) {
+    list.innerHTML = '<div style="text-align:center; color:var(--text-dim); font-size:13px; padding:20px;">暂无历史记录</div>';
+    return;
+  }
+
+  list.innerHTML = history.map(item => `
+    <div class="history-item" data-id="${item.id}">
+      <div class="info">
+        <div class="text">${escapeHtml(item.text)}</div>
+        <div class="meta">${item.model} · ${item.timestamp}</div>
+      </div>
+      <div class="actions">
+        <button class="btn btn-secondary btn-small" onclick="playHistory(${item.id})">&#9654;</button>
+        <button class="btn btn-secondary btn-small" onclick="downloadHistory(${item.id})">&#11015;</button>
+        <button class="btn btn-danger btn-small" onclick="deleteHistory(${item.id})">&#10005;</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function playHistory(id) {
+  const history = getHistory();
+  const item = history.find(h => h.id === id);
+  if (!item) return;
+
+  const binaryStr = atob(item.audioBase64);
+  const bytes = new Uint8Array(binaryStr.length);
+  for (let i = 0; i < binaryStr.length; i++) {
+    bytes[i] = binaryStr.charCodeAt(i);
+  }
+  const blob = new Blob([bytes], { type: 'audio/wav' });
+  currentAudioBlob = blob;
+  playAudio(blob, 'wav');
+  setStatus('ready', '正在播放历史记录');
+}
+
+function downloadHistory(id) {
+  const history = getHistory();
+  const item = history.find(h => h.id === id);
+  if (!item) return;
+
+  const binaryStr = atob(item.audioBase64);
+  const bytes = new Uint8Array(binaryStr.length);
+  for (let i = 0; i < binaryStr.length; i++) {
+    bytes[i] = binaryStr.charCodeAt(i);
+  }
+  const blob = new Blob([bytes], { type: 'audio/wav' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `mimo_tts_${id}.wav`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function deleteHistory(id) {
+  let history = getHistory();
+  history = history.filter(h => h.id !== id);
+  localStorage.setItem('mimo_tts_history', JSON.stringify(history));
+  renderHistory();
+}
+
+function clearHistory() {
+  localStorage.removeItem('mimo_tts_history');
+  renderHistory();
+}
+
+// ═══════════════════════════════════════════
+// Utilities
+// ═══════════════════════════════════════════
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+</script>
+
+<!-- CSS Animation -->
+<style>
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+</style>
+</body>
+</html>
