@@ -10,6 +10,26 @@
 - 音频可视化
 - 历史记录
 
+## 功能截图
+
+### 模型 A：预置音色（mimo-v2.5-tts）
+
+选择预置音色，支持导演模式、情绪/音频标签插入、快捷预设。
+
+![预置音色](screenshots/model-a.png)
+
+### 模型 B：文本设计音色（mimo-v2.5-tts-voicedesign）
+
+通过文字描述音色特征，自由设计个性化音色。
+
+![文本设计音色](screenshots/model-b.png)
+
+### 模型 C：音色复刻（mimo-v2.5-tts-voiceclone）
+
+上传音频样本，复刻目标音色进行语音合成。
+
+![音色复刻](screenshots/model-c.png)
+
 ## 快速开始
 
 ### 方式一：直接打开（需配置 CORS 或使用代理）
